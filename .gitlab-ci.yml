@@ -1,0 +1,112 @@
+variables:
+  TAG_LATEST: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME:latest
+  TAG_COMMIT: $CI_REGISTRY_IMAGE/$CI_COMMIT_REF_NAME:$CI_COMMIT_SHORT_SHA
+  DEV_URL: https://console-dev.saas.beemata.dev
+  DEV_ENV: development
+
+stages:
+  - build
+  - deploy # TODO: Move after fixing lint and test
+  - lint
+  - test
+
+composer:
+  stage: build
+  tags:
+    - deployment
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-composer
+    paths:
+      - vendor/
+  script:
+    - composer install --prefer-dist --no-ansi --no-interaction --no-progress --no-scripts
+    - cp .env.example .env
+  artifacts:
+    expire_in: 1 month
+    paths:
+      - vendor/
+      - .env
+
+npm:
+  stage: build
+  tags:
+    - deployment
+  cache:
+    key: ${CI_COMMIT_REF_SLUG}-npm
+    paths:
+      - node_modules/
+  script:
+    - npm install
+    - npm run production
+  artifacts:
+    expire_in: 1 month
+    paths:
+      - node_modules/
+      - public/css/
+      - public/js/
+
+phpcs:
+  stage: lint
+  tags:
+    - deployment
+  dependencies:
+    - composer
+  script:
+    - composer phpcs
+
+phpstan:
+  stage: lint
+  tags:
+    - deployment
+  dependencies:
+    - composer
+  script:
+    - composer phpstan
+
+eslint:
+  stage: lint
+  tags:
+    - deployment
+  dependencies:
+    - npm
+  script:
+    - npm run lint
+    - npm run lint_report
+  artifacts:
+    paths:
+      - eslint-report.html
+
+phpunit:
+  stage: test
+  tags:
+    - deployment
+  dependencies:
+    - composer
+  script:
+    - composer test
+
+staging:
+  stage: deploy
+  tags:
+    - deployment
+  script:
+    - ssh -o StrictHostKeyChecking=no $SERVER_1 "$ROOT_DIR/scripts/deploy.sh '$TEAMS_WEBHOOK_URL' '$CI_PROJECT_NAME' '$GITLAB_USER_NAME' 'The update has been deployed' '$DEV_URL' '$DEV_ENV'"
+  environment:
+    name: $DEV_ENV
+    url: $DEV_URL
+  only:
+    - master
+
+# production:
+#   stage: deploy
+#   script:
+#     - *init_ssh
+#     - *change_file_permissions
+#     - php artisan deploy yourdomain.com -s upload
+#   environment:
+#     name: production
+#     url: http://yourdomain.com
+#   when: manual
+#   only:
+#    - master
+

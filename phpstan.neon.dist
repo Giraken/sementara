@@ -1,0 +1,23 @@
+includes:
+    - ./vendor/nunomaduro/larastan/extension.neon
+
+parameters:
+
+    paths:
+        - app
+        - database
+        - routes
+        - resources/views
+
+    # The level 9 is the highest level
+    # TODO: increase level
+    level: 0
+
+    ignoreErrors:
+        - '#Access to an undefined property App\\Http\\Controllers\\[a-zA-Z0-9\\_]+::\$(\w)+#'
+
+    excludePaths:
+        - ./*/*/FileToBeExcluded.php
+
+    checkMissingIterableValueType: false
+    reportUnmatchedIgnoredErrors: false
